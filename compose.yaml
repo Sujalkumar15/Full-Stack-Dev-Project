@@ -1,0 +1,30 @@
+name: collaborative-workspace-project2
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: collaborative-workspace-postgres
+    restart: unless-stopped
+    env_file:
+      - ./apps/api/.env
+    ports:
+      - '127.0.0.1:5434:5432'
+    volumes:
+      - collaborative-workspace-postgres-data:/var/lib/postgresql/data
+    networks:
+      - collaborative-workspace-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  collaborative-workspace-postgres-data:
+    name: collaborative-workspace-postgres-data
+
+networks:
+  collaborative-workspace-network:
+    name: collaborative-workspace-network
+    driver: bridge
