@@ -3,6 +3,7 @@ import { useAuth } from "./auth/AuthProvider";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
+import { ProjectBoardPage } from "./pages/ProjectBoardPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { WorkspacesPage } from "./pages/WorkspacesPage";
 import { GuestRoute } from "./routes/GuestRoute";
@@ -25,6 +26,7 @@ export function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/workspaces" element={<WorkspacesPage />} />
         <Route path="/workspaces/:workspaceId/dashboard" element={<DashboardPage />} />
+        <Route path="/workspaces/:workspaceId/projects/:projectId" element={<ProjectBoardPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

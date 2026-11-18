@@ -1,34 +1,50 @@
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { useAuth } from "../auth/AuthProvider";
-import { BrandMark } from "../components/BrandMark";
-import { ApiError, apiRequest } from "../lib/api";
-import type { Workspace } from "../types/api";
+import { useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { LoadingScreen } from "../components/LoadingScreen";
+import { ProjectFormModal } from "../components/ProjectFormModal";
+import { WorkspaceShell } from "../components/WorkspaceShell";
+import { useWorkspaceData } from "../hooks/useWorkspaceData";
+import type { Project } from "../types/api";
 
 export function DashboardPage() {
   const { workspaceId = "" } = useParams();
-  const { user, logout } = useAuth();
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [error, setError] = useState("");
+  const navigate = useNavigate();
+  const { workspace, projects, setProjects, isLoading, error } = useWorkspaceData(workspaceId);
+  const [creatingProject, setCreatingProject] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    apiRequest<{ data: { workspace: Workspace } }>(`/workspaces/${workspaceId}`)
-      .then((response) => { if (active) setWorkspace(response.data.workspace); })
-      .catch((caught) => { if (active) setError(caught instanceof ApiError ? caught.message : "Unable to open this workspace."); });
-    return () => { active = false; };
-  }, [workspaceId]);
+  if (isLoading) return <LoadingScreen />;
+  if (!workspace || error) {
+    return <main className="grid min-h-screen place-items-center bg-canvas p-6"><div className="max-w-md rounded-3xl border border-rose-200 bg-white p-8 text-center shadow-card"><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-rose-50 text-xl text-rose-600">!</div><h1 className="mt-5 text-xl font-bold text-ink">Workspace unavailable</h1><p className="mt-2 text-sm leading-6 text-slate-500">{error || "This workspace could not be found."}</p><Link to="/workspaces" className="mt-6 inline-flex rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-white">Return to workspaces</Link></div></main>;
+  }
+
+  const activeWorkspace = workspace;
+  const canManage = activeWorkspace.role === "OWNER" || activeWorkspace.role === "ADMIN";
+  const issueTotal = projects.reduce((sum, project) => sum + project.issueCount, 0);
+
+  function projectCreated(project: Project) {
+    setProjects((current) => [project, ...current]);
+    setCreatingProject(false);
+    navigate(`/workspaces/${activeWorkspace.id}/projects/${project.id}`);
+  }
 
   return (
-    <main className="min-h-screen bg-canvas">
-      <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8"><BrandMark /><div className="flex items-center gap-3"><span className="hidden text-sm text-slate-500 md:block">{user?.displayName ?? user?.email}</span><button onClick={() => void logout()} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">Sign out</button></div></div></header>
-      <div className="mx-auto grid max-w-7xl gap-8 px-5 py-8 sm:px-8 lg:grid-cols-[230px_1fr]">
-        <aside className="rounded-2xl border border-slate-200 bg-white p-4 lg:min-h-[calc(100vh-8rem)]"><Link to="/workspaces" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-50">← All workspaces</Link><div className="mt-5 border-t border-slate-100 pt-5"><p className="px-3 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">Workspace</p><div className="mt-3 rounded-xl bg-violet-50 px-3 py-3"><p className="font-semibold text-ink">{workspace?.name ?? "Loading…"}</p><p className="mt-1 text-xs font-semibold text-brand-600">{workspace?.role ?? ""}</p></div></div><nav className="mt-5 space-y-1"><span className="flex rounded-xl bg-ink px-3 py-2.5 text-sm font-semibold text-white">Overview</span><span className="flex rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400">Projects · coming next</span></nav></aside>
-        <section>
-          {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-700" role="alert"><p className="font-semibold">Workspace unavailable</p><p className="mt-1 text-sm">{error}</p><Link to="/workspaces" className="mt-4 inline-flex text-sm font-semibold underline">Return to workspaces</Link></div> : null}
-          {!error ? <><div className="rounded-3xl bg-ink p-8 text-white shadow-card sm:p-10"><p className="text-sm font-semibold uppercase tracking-[0.16em] text-violet-300">Workspace overview</p><h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">Welcome to {workspace?.name ?? "your workspace"}</h1><p className="mt-4 max-w-2xl leading-7 text-slate-300">Your secure tenant is ready. Project planning and Kanban workflows will be added in the next implementation phase.</p></div><div className="mt-6 grid gap-5 sm:grid-cols-3">{[["Role", workspace?.role ?? "—"], ["Members", "Secure access"], ["Projects", "Coming next"]].map(([label, value]) => <div key={label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card"><p className="text-sm font-medium text-slate-400">{label}</p><p className="mt-2 text-lg font-bold text-ink">{value}</p></div>)}</div></> : null}
+    <WorkspaceShell workspace={workspace} projects={projects} onCreateProject={canManage ? () => setCreatingProject(true) : undefined}>
+      <div className="mx-auto max-w-[1500px] px-5 py-7 sm:px-8 sm:py-10">
+        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div><p className="text-xs font-black uppercase tracking-[0.18em] text-brand-600">Workspace overview</p><h1 className="mt-2 text-3xl font-bold tracking-[-0.035em] text-ink sm:text-4xl">Good work starts with clarity.</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">Create focused projects, capture the next action, and keep delivery moving across the board.</p></div>
+          {canManage ? <button onClick={() => setCreatingProject(true)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:bg-brand-700"><span className="text-lg">+</span> New project</button> : null}
+        </div>
+
+        <section className="mt-8 grid gap-4 sm:grid-cols-3">
+          {[{ label: "Active projects", value: projects.length, detail: "Across this workspace", tone: "bg-violet-50 text-brand-700" }, { label: "Tracked issues", value: issueTotal, detail: "All project boards", tone: "bg-sky-50 text-sky-700" }, { label: "Your access", value: workspace.role, detail: "Database-verified role", tone: "bg-emerald-50 text-emerald-700" }].map((stat) => <article key={stat.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card"><div className={`inline-flex rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${stat.tone}`}>{stat.label}</div><p className="mt-4 text-3xl font-black tracking-tight text-ink">{stat.value}</p><p className="mt-1 text-xs text-slate-400">{stat.detail}</p></article>)}
+        </section>
+
+        <section className="mt-8 rounded-3xl border border-slate-200 bg-white shadow-card">
+          <header className="flex items-center justify-between border-b border-slate-100 px-5 py-5 sm:px-7"><div><h2 className="text-lg font-bold text-ink">Projects</h2><p className="mt-1 text-sm text-slate-400">Your workspace delivery areas</p></div>{canManage && projects.length ? <button onClick={() => setCreatingProject(true)} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-bold text-slate-600 hover:border-violet-200 hover:bg-violet-50 hover:text-brand-700">Create project</button> : null}</header>
+          {projects.length ? <div className="divide-y divide-slate-100">{projects.map((project) => <Link key={project.id} to={`/workspaces/${workspace.id}/projects/${project.id}`} className="group flex items-center gap-4 px-5 py-5 transition hover:bg-slate-50/80 sm:px-7"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-ink text-[11px] font-black text-white">{project.key.slice(0, 3)}</span><span className="min-w-0 flex-1"><span className="block truncate font-bold text-ink group-hover:text-brand-700">{project.name}</span><span className="mt-1 block truncate text-xs text-slate-400">{project.description || "No description yet"}</span></span><span className="hidden rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-500 sm:block">{project.issueCount} {project.issueCount === 1 ? "issue" : "issues"}</span><span className="text-xl text-slate-300 transition group-hover:translate-x-1 group-hover:text-brand-600">→</span></Link>)}</div> : <div className="px-6 py-16 text-center"><div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-violet-50 text-2xl text-brand-600">◇</div><h3 className="mt-5 text-lg font-bold text-ink">Create your first project</h3><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">Projects organize related issues into a clear, shared delivery board.</p>{canManage ? <button onClick={() => setCreatingProject(true)} className="mt-6 rounded-xl bg-ink px-5 py-3 text-sm font-bold text-white hover:bg-slate-800">Create project</button> : <p className="mt-5 text-sm font-semibold text-slate-400">Ask a workspace admin to create a project.</p>}</div>}
         </section>
       </div>
-    </main>
+      {creatingProject ? <ProjectFormModal workspaceId={workspace.id} onClose={() => setCreatingProject(false)} onSaved={projectCreated} /> : null}
+    </WorkspaceShell>
   );
 }
