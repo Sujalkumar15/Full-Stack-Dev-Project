@@ -3,6 +3,16 @@ import { z, ZodError } from "zod";
 import { AppError } from "../errors/app-error.js";
 
 export const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
+  if (error instanceof SyntaxError && "body" in error) {
+    response.status(400).json({
+      error: {
+        code: "INVALID_JSON",
+        message: "The request body contains invalid JSON",
+      },
+    });
+    return;
+  }
+
   if (error instanceof ZodError) {
     response.status(400).json({
       error: {
@@ -24,7 +34,10 @@ export const errorHandler: ErrorRequestHandler = (error, _request, response, _ne
     return;
   }
 
-  console.error(error);
+  console.error("Unhandled API error", {
+    name: error instanceof Error ? error.name : "UnknownError",
+    message: error instanceof Error ? error.message : "Unknown error",
+  });
   response.status(500).json({
     error: {
       code: "INTERNAL_SERVER_ERROR",

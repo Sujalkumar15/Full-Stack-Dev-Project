@@ -17,3 +17,15 @@ Foundation for a multi-tenant project management platform built with React, Expr
 5. Start the web app with `npm run dev:web`.
 
 The web app runs on port `5174`, the API on `3001`, and PostgreSQL is published on host port `5433`.
+
+## Authentication foundation
+
+Authentication uses a signed JWT stored in an HttpOnly cookie. Keep `JWT_SECRET` only in local or deployed environment configuration and use at least 32 random characters outside local development.
+
+Available endpoints:
+
+- `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `GET /api/workspaces`, `GET /api/workspaces/:workspaceId`
+
+Workspace access is resolved from active database memberships on every tenant-scoped request; frontend-supplied roles or user IDs are never authorization inputs.

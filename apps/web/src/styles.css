@@ -5,6 +5,7 @@
   --color-canvas: #f6f7fb;
   --color-brand-500: #6757d9;
   --color-brand-600: #5646c7;
+  --color-brand-700: #4738ad;
   --shadow-card: 0 18px 50px -30px rgba(23, 32, 51, 0.35);
 }
 
@@ -22,6 +23,42 @@
 
 body {
   margin: 0;
-  min-width: 320px;
   min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.auth-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(1px);
+  pointer-events: none;
+}
+
+.auth-orb-one {
+  width: 32rem;
+  height: 32rem;
+  right: -12rem;
+  top: -10rem;
+  background: radial-gradient(circle at 35% 35%, rgba(139, 92, 246, 0.65), rgba(86, 70, 199, 0.05) 68%);
+}
+
+.auth-orb-two {
+  width: 24rem;
+  height: 24rem;
+  left: -9rem;
+  bottom: -9rem;
+  background: radial-gradient(circle at 55% 45%, rgba(34, 211, 238, 0.18), rgba(23, 32, 51, 0) 70%);
+}
+
+::selection {
+  color: white;
+  background: #6757d9;
 }
