@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum IssueStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELED
+}
+
+enum IssuePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  CANCELED
+}
+
+model User {
+  id           String       @id @default(uuid()) @db.Uuid
+  email        String       @unique
+  displayName  String?
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  memberships  Membership[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String
+  slug         String        @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  memberships  Membership[]
+  projects     Project[]
+  issues       Issue[]
+  sprints      Sprint[]
+  comments     Comment[]
+  activityLogs ActivityLog[]
+
+  @@map("workspaces")
+}
+
+model Membership {
+  id               String         @id @default(uuid()) @db.Uuid
+  workspaceId      String         @db.Uuid
+  userId           String         @db.Uuid
+  role             MembershipRole @default(MEMBER)
+  isActive         Boolean        @default(true)
+  deactivatedAt    DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  workspace        Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reportedIssues   Issue[]        @relation("IssueReporter")
+  assignedIssues   Issue[]        @relation("IssueAssignee")
+  authoredComments Comment[]      @relation("CommentAuthor")
+  activityLogs     ActivityLog[]  @relation("ActivityActor")
+
+  @@unique([workspaceId, userId])
+  @@unique([workspaceId, id])
+  @@index([userId])
+  @@index([workspaceId, role])
+  @@index([userId, isActive])
+  @@map("memberships")
+}
+
+model Project {
+  id           String        @id @default(uuid()) @db.Uuid
+  workspaceId  String        @db.Uuid
+  name         String
+  key          String
+  description  String?
+  issueCounter Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  issues       Issue[]
+  sprints      Sprint[]
+  activityLogs ActivityLog[]
+
+  @@unique([workspaceId, key])
+  @@unique([workspaceId, id])
+  @@index([workspaceId, createdAt])
+  @@map("projects")
+}
+
+model Sprint {
+  id          String       @id @default(uuid()) @db.Uuid
+  workspaceId String       @db.Uuid
+  projectId   String       @db.Uuid
+  name        String
+  goal        String?
+  status      SprintStatus @default(PLANNED)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project      @relation(fields: [workspaceId, projectId], references: [workspaceId, id], onDelete: Cascade)
+  issues      Issue[]
+
+  @@unique([workspaceId, projectId, id])
+  @@index([workspaceId, projectId, status])
+  @@map("sprints")
+}
+
+model Issue {
+  id                   String        @id @default(uuid()) @db.Uuid
+  workspaceId          String        @db.Uuid
+  projectId            String        @db.Uuid
+  sprintId             String?       @db.Uuid
+  reporterMembershipId String        @db.Uuid
+  assigneeMembershipId String?       @db.Uuid
+  number               Int
+  title                String
+  description          String?
+  status               IssueStatus   @default(BACKLOG)
+  priority             IssuePriority @default(MEDIUM)
+  dueAt                DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  workspace            Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project              Project       @relation(fields: [workspaceId, projectId], references: [workspaceId, id], onDelete: Cascade)
+  sprint               Sprint?       @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  reporter             Membership    @relation("IssueReporter", fields: [reporterMembershipId], references: [id], onDelete: Restrict)
+  assignee             Membership?   @relation("IssueAssignee", fields: [assigneeMembershipId], references: [id], onDelete: SetNull)
+  comments             Comment[]
+  activityLogs         ActivityLog[]
+
+  @@unique([workspaceId, projectId, number])
+  @@unique([workspaceId, id])
+  @@index([workspaceId, status])
+  @@index([workspaceId, assigneeMembershipId, status])
+  @@index([projectId, sprintId])
+  @@index([reporterMembershipId])
+  @@map("issues")
+}
+
+model Comment {
+  id                 String     @id @default(uuid()) @db.Uuid
+  workspaceId        String     @db.Uuid
+  issueId            String     @db.Uuid
+  authorMembershipId String     @db.Uuid
+  body               String
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  workspace          Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  issue              Issue      @relation(fields: [workspaceId, issueId], references: [workspaceId, id], onDelete: Cascade)
+  author             Membership @relation("CommentAuthor", fields: [authorMembershipId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, issueId, createdAt])
+  @@index([authorMembershipId])
+  @@map("comments")
+}
+
+model ActivityLog {
+  id                String      @id @default(uuid()) @db.Uuid
+  workspaceId       String      @db.Uuid
+  projectId         String?     @db.Uuid
+  issueId           String?     @db.Uuid
+  actorMembershipId String?     @db.Uuid
+  action            String
+  entityType        String
+  entityId          String      @db.Uuid
+  metadata          Json?
+  createdAt         DateTime    @default(now())
+  workspace         Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project           Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  issue             Issue?      @relation(fields: [issueId], references: [id], onDelete: SetNull)
+  actor             Membership? @relation("ActivityActor", fields: [actorMembershipId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, entityType, entityId])
+  @@index([projectId])
+  @@index([issueId])
+  @@index([actorMembershipId])
+  @@map("activity_logs")
+}
