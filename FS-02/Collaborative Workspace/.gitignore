@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+.vite/
+*.log
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+apps/api/prisma/dev.db
+apps/api/prisma/dev.db-journal

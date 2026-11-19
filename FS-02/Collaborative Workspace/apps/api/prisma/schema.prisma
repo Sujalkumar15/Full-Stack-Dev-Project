@@ -1,0 +1,217 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  GUEST
+}
+
+enum PageVisibility {
+  WORKSPACE
+  RESTRICTED
+}
+
+enum PageAccess {
+  READ
+  COMMENT
+  EDIT
+  MANAGE
+}
+
+enum CommentStatus {
+  OPEN
+  RESOLVED
+}
+
+model User {
+  id           String            @id @default(uuid()) @db.Uuid
+  email        String            @unique
+  name         String
+  avatarUrl    String?           @map("avatar_url")
+  passwordHash String?           @map("password_hash")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  sessions     Session[]
+  memberships  WorkspaceMember[]
+  ownedSpaces  Workspace[]       @relation("WorkspaceOwner")
+
+  @@map("users")
+}
+
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  tokenHash  String   @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Workspace {
+  id        String            @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String            @unique
+  ownerId   String            @map("owner_id") @db.Uuid
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  owner     User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members   WorkspaceMember[]
+  pages     Page[]
+
+  @@index([ownerId])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  workspaceId        String            @map("workspace_id") @db.Uuid
+  userId             String            @map("user_id") @db.Uuid
+  role               WorkspaceRole     @default(MEMBER)
+  joinedAt           DateTime          @default(now()) @map("joined_at")
+  workspace          Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdPages       Page[]            @relation("PageCreator")
+  editedPages        Page[]            @relation("PageLastEditor")
+  pagePermissions    PagePermission[]  @relation("PermissionSubject")
+  grantedPermissions PagePermission[]  @relation("PermissionGrantor")
+  comments           Comment[]
+  documentVersions   DocumentVersion[]
+
+  @@id([workspaceId, userId])
+  @@index([userId])
+  @@index([workspaceId, role])
+  @@map("workspace_members")
+}
+
+model Page {
+  id             String            @default(uuid()) @db.Uuid
+  workspaceId    String            @map("workspace_id") @db.Uuid
+  parentId       String?           @map("parent_id") @db.Uuid
+  title          String            @default("Untitled")
+  visibility     PageVisibility    @default(WORKSPACE)
+  sortOrder      Float             @default(0) @map("sort_order")
+  createdById    String            @map("created_by_id") @db.Uuid
+  lastEditedById String?           @map("last_edited_by_id") @db.Uuid
+  archivedAt     DateTime?         @map("archived_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent         Page?             @relation("PageHierarchy", fields: [workspaceId, parentId], references: [workspaceId, id], onDelete: NoAction)
+  children       Page[]            @relation("PageHierarchy")
+  createdBy      WorkspaceMember   @relation("PageCreator", fields: [workspaceId, createdById], references: [workspaceId, userId], onDelete: Restrict)
+  lastEditedBy   WorkspaceMember?  @relation("PageLastEditor", fields: [workspaceId, lastEditedById], references: [workspaceId, userId], onDelete: NoAction)
+  permissions    PagePermission[]
+  yjsDocument    YjsDocument?
+  comments       Comment[]
+  versions       DocumentVersion[]
+
+  @@id([id])
+  @@unique([workspaceId, id])
+  @@index([workspaceId, parentId, sortOrder])
+  @@index([workspaceId, archivedAt])
+  @@map("pages")
+}
+
+model PagePermission {
+  id          String          @default(uuid()) @db.Uuid
+  workspaceId String          @map("workspace_id") @db.Uuid
+  pageId      String          @map("page_id") @db.Uuid
+  userId      String          @map("user_id") @db.Uuid
+  access      PageAccess
+  grantedById String          @map("granted_by_id") @db.Uuid
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  page        Page            @relation(fields: [workspaceId, pageId], references: [workspaceId, id], onDelete: Cascade)
+  subject     WorkspaceMember @relation("PermissionSubject", fields: [workspaceId, userId], references: [workspaceId, userId], onDelete: Cascade)
+  grantedBy   WorkspaceMember @relation("PermissionGrantor", fields: [workspaceId, grantedById], references: [workspaceId, userId], onDelete: Restrict)
+
+  @@id([id])
+  @@unique([workspaceId, pageId, userId])
+  @@index([workspaceId, userId])
+  @@map("page_permissions")
+}
+
+model YjsDocument {
+  pageId      String      @id @map("page_id") @db.Uuid
+  workspaceId String      @map("workspace_id") @db.Uuid
+  snapshot    Bytes
+  stateVector Bytes?      @map("state_vector")
+  snapshotSeq BigInt      @default(0) @map("snapshot_seq")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  page        Page        @relation(fields: [workspaceId, pageId], references: [workspaceId, id], onDelete: Cascade)
+  updates     YjsUpdate[]
+
+  @@unique([workspaceId, pageId])
+  @@map("yjs_documents")
+}
+
+model YjsUpdate {
+  id          BigInt      @id @default(autoincrement())
+  workspaceId String      @map("workspace_id") @db.Uuid
+  pageId      String      @map("page_id") @db.Uuid
+  update      Bytes
+  updateHash  String?     @map("update_hash") @db.VarChar(64)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  document    YjsDocument @relation(fields: [workspaceId, pageId], references: [workspaceId, pageId], onDelete: Cascade)
+
+  @@unique([workspaceId, pageId, updateHash])
+  @@index([workspaceId, pageId, id])
+  @@map("yjs_updates")
+}
+
+model Comment {
+  id          String          @default(uuid()) @db.Uuid
+  workspaceId String          @map("workspace_id") @db.Uuid
+  pageId      String          @map("page_id") @db.Uuid
+  parentId    String?         @map("parent_id") @db.Uuid
+  authorId    String          @map("author_id") @db.Uuid
+  body        String
+  anchorStart Bytes?          @map("anchor_start")
+  anchorEnd   Bytes?          @map("anchor_end")
+  quotedText  String?         @map("quoted_text")
+  status      CommentStatus   @default(OPEN)
+  resolvedAt  DateTime?       @map("resolved_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  page        Page            @relation(fields: [workspaceId, pageId], references: [workspaceId, id], onDelete: Cascade)
+  author      WorkspaceMember @relation(fields: [workspaceId, authorId], references: [workspaceId, userId], onDelete: Restrict)
+  parent      Comment?        @relation("CommentReplies", fields: [workspaceId, parentId], references: [workspaceId, id], onDelete: NoAction)
+  replies     Comment[]       @relation("CommentReplies")
+
+  @@id([id])
+  @@unique([workspaceId, id])
+  @@index([workspaceId, pageId, createdAt])
+  @@index([workspaceId, parentId])
+  @@map("comments")
+}
+
+model DocumentVersion {
+  id          String          @default(uuid()) @db.Uuid
+  workspaceId String          @map("workspace_id") @db.Uuid
+  pageId      String          @map("page_id") @db.Uuid
+  version     Int
+  label       String?
+  snapshot    Bytes
+  stateVector Bytes?          @map("state_vector")
+  createdById String          @map("created_by_id") @db.Uuid
+  createdAt   DateTime        @default(now()) @map("created_at")
+  page        Page            @relation(fields: [workspaceId, pageId], references: [workspaceId, id], onDelete: Cascade)
+  createdBy   WorkspaceMember @relation(fields: [workspaceId, createdById], references: [workspaceId, userId], onDelete: Restrict)
+
+  @@id([id])
+  @@unique([workspaceId, pageId, version])
+  @@index([workspaceId, pageId, createdAt])
+  @@map("document_versions")
+}
