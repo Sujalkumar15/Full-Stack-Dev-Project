@@ -1,24 +1,29 @@
 # Full-Stack Development Projects
 
-This submission contains two independent full-stack applications. Each project has its own source tree, npm workspace configuration, environment files, PostgreSQL database, Docker resources, migration history, ports, and Git repository. Run commands from the selected project's directory; this index is navigation and comparison documentation, not a shared monorepo.
+This repository contains two independent full-stack applications integrated through Git subtree. Each project keeps its own source tree, npm workspace configuration, environment files, PostgreSQL database, Docker resources, migration history, and ports. Run application commands from the selected project's nested directory; the repository root is a submission index, not a shared application monorepo.
 
 ## Project navigation
 
-| ID    | Project                 | Objective                                                                                                  | Documentation                                                 |
-| ----- | ----------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| FS-04 | SaaS Project Management | Provide tenant-isolated project planning, issue tracking, and an interactive Kanban workflow               | [Open the FS-04 README](../saas-project-management/README.md) |
-| FS-02 | Collaborative Workspace | Provide hierarchical workspaces and genuine multi-user rich-text editing with durable CRDT synchronization | [Open the FS-02 README](../collaborative-workspace/README.md) |
+| ID    | Project                 | Objective                                                                                                  | Documentation                                                    |
+| ----- | ----------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| FS-04 | SaaS Project Management | Provide tenant-isolated project planning, issue tracking, and an interactive Kanban workflow               | [Open the FS-04 README](FS-04/SaaS Project Management/README.md) |
+| FS-02 | Collaborative Workspace | Provide hierarchical workspaces and genuine multi-user rich-text editing with durable CRDT synchronization | [Open the FS-02 README](FS-02/Collaborative Workspace/README.md) |
 
-The projects remain in their existing sibling directories and have not been moved or copied:
+The final repository structure is:
 
 ```text
-Projects/
-├── Full-Stack-Development-Projects/
-│   └── README.md                         # This submission index
-├── saas-project-management/
-│   └── README.md                         # FS-04 documentation
-└── collaborative-workspace/
-    └── README.md                         # FS-02 documentation
+Full-Stack-Development-Projects/
+├── README.md
+├── FS-04/
+│   └── SaaS Project Management/
+│       ├── apps/
+│       ├── packages/
+│       └── README.md
+└── FS-02/
+    └── Collaborative Workspace/
+        ├── apps/
+        ├── packages/
+        └── README.md
 ```
 
 ## FS-04 — SaaS Project Management
@@ -88,12 +93,24 @@ Both projects use npm workspaces and PostgreSQL 16, but they intentionally use d
 
 ## Getting started
 
-Choose one application, change into its directory, and follow its README. The relative links below work from this index:
+Choose one application, change into its nested directory, and follow its README:
 
-- [FS-04 setup and reference](../saas-project-management/README.md)
-- [FS-02 setup and reference](../collaborative-workspace/README.md)
+- [FS-04 setup and reference](FS-04/SaaS Project Management/README.md)
+- [FS-02 setup and reference](FS-02/Collaborative Workspace/README.md)
 
-Do not run application commands from `Full-Stack-Development-Projects`. It contains only this combined submission guide.
+For example, from the repository root:
+
+```powershell
+Set-Location 'FS-04/SaaS Project Management'
+```
+
+or:
+
+```powershell
+Set-Location 'FS-02/Collaborative Workspace'
+```
+
+Do not run application scripts from the repository root; run them from the corresponding nested project directory.
 
 For either project, the general sequence is:
 
@@ -109,7 +126,7 @@ Do not create a new initial migration on a fresh installation. Each application 
 
 ## Independence and data isolation
 
-These are separate applications, not packages in one runtime:
+These are separate applications tracked together in one submission repository, not packages in one runtime:
 
 - Do not share `.env` files, database URLs, secrets, containers, volumes, or Prisma migrations.
 - Run scripts only from the corresponding project directory.
