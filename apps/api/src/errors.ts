@@ -18,6 +18,17 @@ export const notFoundHandler: RequestHandler = (request, _response, next) => {
 };
 
 export const errorHandler: ErrorRequestHandler = (error, request, response, _next) => {
+  if (error instanceof SyntaxError && 'body' in error) {
+    response.status(400).json({
+      error: {
+        code: 'INVALID_JSON',
+        message: 'The request body is not valid JSON.',
+        requestId: request.id,
+      },
+    });
+    return;
+  }
+
   if (error instanceof ZodError) {
     response.status(400).json({
       error: {

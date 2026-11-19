@@ -8,7 +8,10 @@ import helmet from 'helmet';
 import pino from 'pino';
 import { pinoHttp } from 'pino-http';
 
+import { createAuthRouter } from './auth/routes.js';
 import { errorHandler, notFoundHandler } from './errors.js';
+import { createPageRouter } from './pages/routes.js';
+import { createWorkspaceRouter } from './workspaces/routes.js';
 
 export interface AppConfig {
   cookieSecret: string;
@@ -23,6 +26,9 @@ export function createApp(config: AppConfig) {
   });
 
   app.disable('x-powered-by');
+  if (config.nodeEnv === 'production') {
+    app.set('trust proxy', 1);
+  }
   app.use(
     pinoHttp({
       logger,
@@ -46,6 +52,10 @@ export function createApp(config: AppConfig) {
   );
   app.use(cookieParser(config.cookieSecret));
   app.use(express.json({ limit: '1mb' }));
+
+  app.use('/api/auth', createAuthRouter(config));
+  app.use('/api/workspaces/:workspaceId/pages', createPageRouter(config));
+  app.use('/api/workspaces', createWorkspaceRouter());
 
   app.get('/api/health', (request, response) => {
     const body: HealthResponse = {

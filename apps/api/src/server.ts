@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { createServer } from 'node:http';
 
 import { createApp } from './app.js';
+import { createCollaborationServer } from './collaboration/server.js';
 import { loadEnvironment } from './env.js';
 import { prisma } from './lib/prisma.js';
 
@@ -13,9 +14,15 @@ const app = createApp({
   nodeEnv: environment.NODE_ENV,
 });
 const server = createServer(app);
+const collaborationServer = createCollaborationServer(server, {
+  tokenSecret: environment.COOKIE_SECRET,
+  frontendOrigin: environment.FRONTEND_ORIGIN,
+});
+let shuttingDown = false;
 
 async function start() {
   await prisma.$connect();
+  await prisma.$queryRaw<Array<{ ready: number }>>`SELECT 1 AS ready`;
 
   server.listen(environment.PORT, () => {
     app.request.log?.info?.(`API listening on http://localhost:${environment.PORT}`);
@@ -23,11 +30,15 @@ async function start() {
 }
 
 async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.info(`${signal} received; shutting down.`);
-  server.close(async () => {
-    await prisma.$disconnect();
-    process.exit(0);
+  await collaborationServer.shutdown();
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
   });
+  await prisma.$disconnect();
+  process.exit(0);
 }
 
 process.once('SIGINT', () => void shutdown('SIGINT'));
